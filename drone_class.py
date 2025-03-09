@@ -12,9 +12,5 @@ class Drone:
         self.constants = np.array([m_d, m_l, I_d, self.L_d, L_l]) # All constant values
         self.state = state_init # State: [x, y, psi, theta, vx, vy, omega, theta_dot]
 
-        # -- Sprite --
-
-
     def update_state(self, state):
         self.state=state
-

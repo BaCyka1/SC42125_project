@@ -4,7 +4,7 @@ from drone_class import Drone
 from MPC_class import MPCController
 
 drone = Drone()
-controller = MPCController()
+controller = MPCController(drone, horizon=20, controller_timestep=1/10)
 simulation = sim.Simulation(drone, controller)
 
 simulation.run_simulation()

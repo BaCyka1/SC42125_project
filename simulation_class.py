@@ -58,7 +58,6 @@ class Simulation:
         Update the state using the coupled drone-load dynamics.
         State: [x, y, psi, theta, vx, vy, omega, theta_dot]
         """
-
         # Get state from drone object
         x, y, psi, theta, vx, vy, psi_dot, theta_dot = self.drone.state
 
@@ -116,7 +115,7 @@ class Simulation:
 
     def animation_step(self, frame):
         # Get control inputs from the controller
-        F1, F2 = self.MPC_controller.compute_control()
+        F1, F2 = self.MPC_controller.compute_control(current_state=self.drone.state, target_state=np.array([1.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
 
         # Update states with control input and dynamics
         self.physics_step(F1, F2)
@@ -151,7 +150,6 @@ class Simulation:
         # Update rod (line) connecting drone and load
         self.rod_line.set_data([x, load_x], [y, load_y])
         self.load_patch.center = (load_x, load_y)
-
         return self.body_patch, self.thruster_left, self.thruster_right, self.arm_left, self.arm_right, self.load_patch, self.rod_line
 
     def run_simulation(self):
