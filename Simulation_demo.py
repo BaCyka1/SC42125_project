@@ -59,16 +59,16 @@ load_radius = 0.2
 load_patch = Circle((0, 0), load_radius, fc='orange', ec='black')
 
 # Rod connecting drone and load
-rod_line = Line2D([0, 0], [0, 0], lw=2, color='gray')
+rod_line = Line2D([0, 0], [0, 0], lw=2, color='black')
 
 # Add patches and lines to the plot
 ax.add_patch(body_patch)
 ax.add_patch(thruster_left)
 ax.add_patch(thruster_right)
-ax.add_patch(load_patch)
+ax.add_line(rod_line)
 ax.add_line(arm_left)
 ax.add_line(arm_right)
-ax.add_line(rod_line)
+ax.add_patch(load_patch)
 
 
 # Drone + Load Dynamics Function
@@ -148,10 +148,10 @@ def animate(frame):
     # Compute load position from drone position and rod geometry
     load_x = x + L_l * np.sin(theta)
     load_y = y - L_l * np.cos(theta)
-    load_patch.center = (load_x, load_y)
 
     # Update rod (line) connecting drone and load
     rod_line.set_data([x, load_x], [y, load_y])
+    load_patch.center = (load_x, load_y)
 
     return body_patch, thruster_left, thruster_right, arm_left, arm_right, load_patch, rod_line
 
