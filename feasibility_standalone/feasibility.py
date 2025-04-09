@@ -3,6 +3,7 @@ import cvxpy as cp
 from scipy.linalg import expm
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+from control import dare
 from time import time
 
 
@@ -10,6 +11,10 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints):
     """
     Checks feasibility for a single initial state by attempting to solve an LP
     """
+    Q = np.eye(8)  # State cost matrix
+    R = np.eye(2)  # Input cost matrix
+    P, _, K = dare(A_d, B_d, Q, R)
+
     # Get shapes for dynamics
     dim_x_d = A_d.shape[0]
     dim_u_d = B_d.shape[1]
@@ -27,10 +32,11 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints):
         constraints += [
             x[k + 1] == A_d @ x[k] + B_d @ u[k],
             H_x @ x[k] <= h_x,
-            H_u @ u[k] <= h_u
+            H_u @ u[k] <= h_u,
         ]
     # Terminal state constraint
     constraints += [H_x @ x[N] <= h_x]
+    constraints += [cp.quad_form(x[N], P) <= 2.18867187]
 
     prob = cp.Problem(cp.Minimize(0), constraints)
     prob.solve()
@@ -63,6 +69,7 @@ def compute_bounding_box_cvxpy(H_x, h_x, default_bound=100.0):
 
         if prob_min.status == cp.OPTIMAL:
             lower = prob_min.value
+            print("here!")
         elif prob_min.status == cp.UNBOUNDED:
             lower = -default_bound
 
@@ -76,9 +83,10 @@ def compute_bounding_box_cvxpy(H_x, h_x, default_bound=100.0):
         elif prob_max.status == cp.UNBOUNDED:
             upper = default_bound
 
+        print(lower, upper)
         bounds.append((lower, upper))
 
-    return np.array(bounds)
+    return np.array(bounds) * 0.1
 
 
 def collect_feasible_samples(n_samples, N, A_d, B_d, constraints):
@@ -95,14 +103,14 @@ def collect_feasible_samples(n_samples, N, A_d, B_d, constraints):
             result = check_feasibility(N, x0, A_d, B_d, constraints)
             if result:
                 feasible_samples.append(x0)
-        if len(feasible_samples) % 20 == 0:
+        if len(feasible_samples) % 20 == 0 and len(feasible_samples) != 0:
             print(f"Collecting, found {len(feasible_samples)} samples so far.")
     feasible_samples = np.array(feasible_samples)
     return feasible_samples
 
 
 # Ellipsoid fitting from https://gist.github.com/Gabriel-p/4ddd31422a88e7cdf953
-def mvee(points, tol=0.1):
+def mvee(points, tol=0.00001):
     print("Fitting ellipsoid to samples")
     N, d = points.shape
     Q = np.column_stack((points, np.ones(N))).T
@@ -129,14 +137,13 @@ def project_ellipsoid_to_2d(A, center, dims):
     Project an ellipsoid defined by (x - center)^T A (x - center) = 1
     onto a 2D plane defined by state index (e.g. [0, 1]).
     """
-
     # Extract submatrix of A and center
     A_2d = A[np.ix_(dims, dims)]
     center_2d = center[dims]
 
     return center_2d, A_2d
 
-
+# Plotting code by GPT-4o
 def plot_ellipsoid_2d(center_2d, A_2d, ax=None, edgecolor='r', facecolor='none', linewidth=2, label=None):
     """
     Plots a 2D ellipsoid defined by (x - center)^T A (x - center) = 1.
@@ -160,8 +167,6 @@ def plot_ellipsoid_2d(center_2d, A_2d, ax=None, edgecolor='r', facecolor='none',
     ax.add_patch(ellipse)
     ax.set_aspect('equal')
     ax.autoscale_view()
-
-
 
 
 def estimate_feasible_region(n_samples, N, A_d, B_d, constraints):
@@ -206,13 +211,6 @@ def generate_dynamics():
 
     return A_d, B_d
 
-# Initial state
-# x0 = np.array([1, 1, np.pi/4, 0, 1, 0, 0, 0])
-# x0[0] = 3
-# x0[1] = 2
-# x0[2] = np.pi/4
-# x0[4] = 3
-
 dim_x_d = 8
 dim_u_d = 2
 
@@ -224,17 +222,27 @@ H_u = np.zeros((2, dim_u_d))
 h_u = np.zeros(2) * 1
 
 
-H_x = np.array([[1, 0, 1, 0, 0, 0, 0 ,0],
-                [0, 1, 0, 0, 1, 0, 0 ,0]])
+H_x = np.array([[1, 0, 0, 0, 0, 0, 0 ,0],
+                [0, 1, 0, 0, 0, 0, 0 ,0],
+                [-1, 0, 0, 0, 0, 0, 0 ,0],
+                [0, -1, 0, 0, 0, 0, 0 ,0]])
 
-h_x = np.ones(2)
 
-H_u = np.zeros((2, dim_u_d))
-h_u = np.zeros(2) * 1
+H_x = np.vstack((np.eye(8), np.eye(8) * -1))
+
+
+h_x = np.ones(H_x.shape[0]) * 10
+
+# H_u = np.array([[1, 0],
+#                 [0, 1],
+#                 [-1, 0],
+#                 [0, -1]])
+#
+# h_u = np.ones(H_u.shape[0]) * 100
 
 A_d, B_d = generate_dynamics()
 
-N = 10
+N = 60
 constraints = (H_x, H_u, h_x, h_u)
 
 n_samples = 200
@@ -254,3 +262,14 @@ for i in range(8):
             plt.scatter(feasible_samples[:, 0], feasible_samples[:, 1], s=10)
             plt.title("2D MVEE Projection")
             plt.show()
+
+
+# Q = np.eye(8)  # State cost matrix
+# R = np.eye(2)  # Input cost matrix
+# P, _, K = dare(A_d, B_d, Q, R)
+# print(P.shape)
+# x0 = np.ones(8) * 2
+# x0 = np.zeros(8)
+# x0[:2] = [10, 10]
+# res = check_feasibility(N, x0, A_d, B_d, constraints)
+# print(res)
