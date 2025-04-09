@@ -5,14 +5,15 @@ from matplotlib.patches import Circle, Rectangle
 from matplotlib.lines import Line2D
 
 # Simulation Parameters
-dt = 0.05  # Time step (seconds)
-m_d = 1.0  # Drone mass
-m_l = 0.1  # Load mass
-g = 9.81  # Gravity (m/s²)
-d = 2.0  # Distance between rotors
-I_d = 0.8  # Drone moment of inertia
-L_d = d / 2  # Distance from drone COM to each thruster
-L_l = 1.5  # Length of the massless rod suspending the load
+freq = 30 # Simulation physics frequency (Hz)
+dt = 1 / freq  # Time step (seconds)
+m_d = 1.0  # Drone mass (kg)
+m_l = 0.1  # Load mass (kg)
+g = 9.81  # Gravity (m/s^2)
+d = 2.0  # Distance between rotors (m)
+I_d = 0.8  # Drone moment of inertia (kg*m^2)
+L_d = d / 2  # Distance from drone COM to each thruster (m)
+L_l = 1.5  # Length of the massless rod suspending the load (m)
 
 # Total mass
 m_tot = m_d + m_l
@@ -33,7 +34,7 @@ ax.set_ylim(0, 15)
 ax.set_aspect('equal')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
-ax.set_title('2D Drone with Suspended Load Simulation')
+ax.set_title('2D Drone with Suspended Load')
 
 # Create sprites
 body_radius = 0.5  # Drone body radius
@@ -49,28 +50,28 @@ arm_right = Line2D([0, 0], [0, 0], lw=4, color='black')
 
 # Thrusters (rectangles)
 thruster_left = Rectangle((-arm_length - thruster_size[0] / 2, -thruster_size[1] / 2),
-                          thruster_size[0], thruster_size[1], fc='black', ec='black')
+                          thruster_size[0], thruster_size[1], fc='black', ec='black', rotation_point="center")
 thruster_right = Rectangle((arm_length - thruster_size[0] / 2, -thruster_size[1] / 2),
-                           thruster_size[0], thruster_size[1], fc='black', ec='black')
+                           thruster_size[0], thruster_size[1], fc='black', ec='black', rotation_point="center")
 
 # Load (suspended mass) as a small circle
 load_radius = 0.2
 load_patch = Circle((0, 0), load_radius, fc='orange', ec='black')
 
 # Rod connecting drone and load
-rod_line = Line2D([0, 0], [0, 0], lw=2, color='gray')
+rod_line = Line2D([0, 0], [0, 0], lw=2, color='black')
 
 # Add patches and lines to the plot
 ax.add_patch(body_patch)
 ax.add_patch(thruster_left)
 ax.add_patch(thruster_right)
-ax.add_patch(load_patch)
+ax.add_line(rod_line)
 ax.add_line(arm_left)
 ax.add_line(arm_right)
-ax.add_line(rod_line)
+ax.add_patch(load_patch)
 
 
-# Drone + Load Dynamics Function (Corrected)
+# Drone + Load Dynamics Function
 def update_state(state, F1, F2, dt):
     """
     Update the state using the coupled drone-load dynamics.
@@ -82,8 +83,7 @@ def update_state(state, F1, F2, dt):
     torque = L_d * (F2 - F1)
 
     # Solve for translational accelerations
-
-
+    # Denominator of translational accelerations
     D_xy = -m_d**2 + m_d*m_l*np.sin(theta)**2 + m_d*m_l*np.cos(theta)**2 -2*m_d*m_l + m_l**2 * np.sin(theta)**2 + m_l**2 * np.cos(theta)**2 - m_l**2
 
     ddx = F_T * (m_d*np.sin(psi) - m_l*np.sin(psi)*np.sin(theta)**2 + m_l*np.sin(psi) - m_l*np.sin(theta)*np.cos(psi)*np.cos(theta))
@@ -96,9 +96,10 @@ def update_state(state, F1, F2, dt):
     ddy += L_l * (m_d*m_l*np.cos(theta)*theta_dot**2 - m_l**2 * np.sin(theta)**2 * np.cos(theta) * theta_dot**2 - m_l**2 * np.cos(theta)**3 * theta_dot**2 + m_l**2 * np.cos(theta) * theta_dot**2)
     ddy /= D_xy
 
+    # Denominator of theta acceleration
     D_theta = -L_l * m_d + L_l * m_l * np.sin(theta)**2 + L_l * m_l * np.cos(theta)**2 - L_l * m_l
 
-    # Pendulum (load) dynamics via the constraint:
+    # Pendulum (load) dynamics:
     ddtheta = F_T * ( - np.sin(psi)*np.cos(theta) + np.cos(psi)*np.sin(theta)) / D_theta
 
     # Drone rotational acceleration
@@ -147,10 +148,10 @@ def animate(frame):
     # Compute load position from drone position and rod geometry
     load_x = x + L_l * np.sin(theta)
     load_y = y - L_l * np.cos(theta)
-    load_patch.center = (load_x, load_y)
 
     # Update rod (line) connecting drone and load
     rod_line.set_data([x, load_x], [y, load_y])
+    load_patch.center = (load_x, load_y)
 
     return body_patch, thruster_left, thruster_right, arm_left, arm_right, load_patch, rod_line
 
