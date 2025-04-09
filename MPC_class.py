@@ -1,10 +1,13 @@
 import numpy as np
 import cvxpy as cp
+from control import dare
+from scipy.linalg import expm
+
 
 class MPCController:
-    def __init__(self, drone, horizon=500, controller_timestep=1/60):
+    def __init__(self, drone, horizon=500, dt=1/60):
         self.horizon = horizon
-        self.timestep = controller_timestep
+        self.timestep = dt
 
         g = 9.81
         m_d = drone.m_d
@@ -29,38 +32,72 @@ class MPCController:
         self.B_c[6, 0] = - L_d / I_d
         self.B_c[6, 1] = L_d / I_d
 
-        # Conversion to discrete time
-        self.A = np.eye(8) + self.A_c * self.timestep
-        self.B = self.B_c * self.timestep
-        self.C = np.eye(8)
-        self.D = np.zeros((1, 2))
+        dim_x_d = self.A_c.shape[0]
+        dim_u_d = self.B_c.shape[1]
 
-    def compute_control(self, current_state, target_state):
+        # Conversion to discrete time
+        AB_c = np.zeros((dim_x_d + dim_u_d, dim_x_d + dim_u_d))
+        AB_c[:dim_x_d, :dim_x_d] = self.A_c
+        AB_c[:dim_x_d, dim_x_d:] = self.B_c
+        expm_AB_c = expm(AB_c * dt)
+        self.A_d = expm_AB_c[:dim_x_d, :dim_x_d]
+        self.B_d = expm_AB_c[:dim_x_d, dim_x_d:]
+        print(self.A_d.shape)
+
+        H_x = np.vstack((np.eye(8), np.eye(8) * -1))
+
+        h_x = np.ones(H_x.shape[0]) * 100
+
+        H_u = np.array([[1, 0],
+                        [0, 1],
+                        [-1, 0],
+                        [0, -1]])
+
+        h_u = np.ones(H_u.shape[0]) * 10
+
+        self.problem_constraints = (H_x, H_u, h_x, h_u)
+
+    def compute_control(self, current_state, target_state, gamma=2.18867187):
         # Penalties
-        Q = np.diag([10, 10, 5, 1, 1, 1, 1, 1]) # State penalties
-        R = 0.01 * np.eye(2) # Control input penalties
+        Q = np.diag([10, 10, 5, 10, 1, 1, 1, 5]) # State penalties
+        R = np.eye(2) * 0.01 # Control input penalties
+
+        P, _, _ = dare(self.A_d, self.B_d, Q, R)
 
         # Hovering target
         u_target = np.array([self.m * 9.81 / 2, self.m * 9.81 / 2])
 
-        # Create the optimization variables
-        x = cp.Variable((8, self.horizon + 1))
-        u = cp.Variable((2, self.horizon))
+        # Unpack the constraints
+        H_x, H_u, h_x, h_u = self.problem_constraints
+
+        # Variables
+        x = [cp.Variable(8) for _ in range(self.horizon + 1)]
+        u = [cp.Variable(2) for _ in range(self.horizon)]
 
         # Constraints and initial cost
         constraints = []
         cost = 0.
 
         # Initial state
-        constraints += [x[:, 0] == current_state.flatten()]
+        constraints += [x[0] == current_state.flatten()]
 
-        for n in range(self.horizon):
-            cost += (cp.quad_form((x[:,n+1]-target_state),Q)  + cp.quad_form(u[:,n]-u_target, R))
-            constraints += [x[:,n+1] == self.A @ x[:,n] + self.B @ u[:,n]]
+        for k in range(self.horizon):
+            cost += (cp.quad_form((x[k+1]-target_state),Q)  + cp.quad_form(u[k]-u_target, R))
+            constraints += [
+                x[k + 1] == self.A_d @ x[k] + self.B_d @ u[k],
+                H_x @ x[k] <= h_x,
+                H_u @ u[k] <= h_u,
+            ]
+        # Terminal state constraint
+        constraints += [H_x @ x[self.horizon] <= h_x]
+        constraints += [cp.quad_form(x[self.horizon]-target_state, P) <= gamma]
+
+        # Terminal cost
+        cost += (cp.quad_form((x[self.horizon] - target_state), Q))
 
         # Solve the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(verbose=False) # solver=cp.OSQP
+        problem.solve(solver=cp.SCS)
 
         # Return first timestep of trajectory
-        return u[:, 0].value
+        return u[0].value
