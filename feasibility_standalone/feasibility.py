@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from control import dare
 from time import time
+from scipy.spatial import ConvexHull
 
-
-def check_feasibility(N, x0, A_d, B_d, problem_constraints):
+def check_feasibility(N, x0, A_d, B_d, problem_constraints, gamma=2.18867187):
     """
-    Checks feasibility for a single initial state by attempting to solve an LP
+    Checks feasibility for a single initial state by attempting to solve a QCLP
     """
     Q = np.eye(8)  # State cost matrix
     R = np.eye(2)  # Input cost matrix
@@ -36,10 +36,10 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints):
         ]
     # Terminal state constraint
     constraints += [H_x @ x[N] <= h_x]
-    constraints += [cp.quad_form(x[N], P) <= 2.18867187]
+    constraints += [cp.quad_form(x[N], P) <= gamma]
 
     prob = cp.Problem(cp.Minimize(0), constraints)
-    prob.solve()
+    prob.solve(solver=cp.SCS)
 
     # Result
     if prob.status in ["optimal", "optimal_inaccurate"]:
@@ -48,12 +48,12 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints):
         return False
 
 
-def compute_bounding_box_cvxpy(H_x, h_x, default_bound=100.0):
+def compute_sample_space(H_x, h_x, default_bound=100.0):
     """
     Finds the upper and lower bounds of a bounding box around the state constraints.
     This box is used for sampling states during the feasibility check.
     """
-    print("Computing bounding box.")
+    print("Computing bounding box for sample space.")
 
     dim = H_x.shape[1]
     bounds = []
@@ -69,7 +69,6 @@ def compute_bounding_box_cvxpy(H_x, h_x, default_bound=100.0):
 
         if prob_min.status == cp.OPTIMAL:
             lower = prob_min.value
-            print("here!")
         elif prob_min.status == cp.UNBOUNDED:
             lower = -default_bound
 
@@ -83,16 +82,21 @@ def compute_bounding_box_cvxpy(H_x, h_x, default_bound=100.0):
         elif prob_max.status == cp.UNBOUNDED:
             upper = default_bound
 
-        print(lower, upper)
         bounds.append((lower, upper))
 
-    return np.array(bounds) * 0.1
+    bounds = np.array(bounds)
+    bounds[2, :] = [-np.pi/1, np.pi/1]
+    bounds[3, :] = [-np.pi / 1, np.pi / 1]
+    bounds[4:, 0] = np.ones(4) * -1
+    bounds[4:, 1] = np.ones(4)
+    print(bounds)
+    return bounds
 
 
 def collect_feasible_samples(n_samples, N, A_d, B_d, constraints):
     print("Started collection of feasible samples.")
     H_x, _, h_x, _ = constraints
-    bounds = compute_bounding_box_cvxpy(H_x, h_x)
+    bounds = compute_sample_space(H_x, h_x)
 
     feasible_samples = []
     while len(feasible_samples) < n_samples:
@@ -171,8 +175,8 @@ def plot_ellipsoid_2d(center_2d, A_2d, ax=None, edgecolor='r', facecolor='none',
 
 def estimate_feasible_region(n_samples, N, A_d, B_d, constraints):
     feasible_samples = collect_feasible_samples(n_samples, N, A_d, B_d, constraints)
-    center, A = mvee(feasible_samples)
-    return feasible_samples, center, A
+    hull = ConvexHull(feasible_samples )
+    return feasible_samples, hull
 
 
 def generate_dynamics():
@@ -231,37 +235,71 @@ H_x = np.array([[1, 0, 0, 0, 0, 0, 0 ,0],
 H_x = np.vstack((np.eye(8), np.eye(8) * -1))
 
 
-h_x = np.ones(H_x.shape[0]) * 10
+h_x = np.ones(H_x.shape[0]) * 2
 
-# H_u = np.array([[1, 0],
-#                 [0, 1],
-#                 [-1, 0],
-#                 [0, -1]])
-#
-# h_u = np.ones(H_u.shape[0]) * 100
+H_u = np.array([[1, 0],
+                [0, 1],
+                [-1, 0],
+                [0, -1]])
+
+h_u = np.ones(H_u.shape[0]) * 100
+
+constraints = (H_x, H_u, h_x, h_u)
 
 A_d, B_d = generate_dynamics()
 
-N = 60
-constraints = (H_x, H_u, h_x, h_u)
-
-n_samples = 200
+N = 20
+n_samples = 100
 
 starttime = time()
-feasible_samples, center, A = estimate_feasible_region(n_samples, N, A_d, B_d, constraints)
-
-print(center)
-print(A)
-print(A.shape)
+feasible_samples = collect_feasible_samples(n_samples, N, A_d, B_d, constraints)
 print(f"Total time to get all data for feasible region visualization: {time() - starttime}")
+
+Q = np.eye(8)  # State cost matrix
+R = np.eye(2)  # Input cost matrix
+P, _, _ = dare(A_d, B_d, Q, R)
+
+
 for i in range(8):
     for j in range(8):
         if i != j:
-            center_2d, A_2d = project_ellipsoid_to_2d(A, center, [i, j])
-            ax = plot_ellipsoid_2d(center_2d, A_2d)
-            plt.scatter(feasible_samples[:, 0], feasible_samples[:, 1], s=10)
-            plt.title("2D MVEE Projection")
+            # Plot the admissible set
+            feasible_samples_2d = feasible_samples[:, [i, j]]
+            hull = ConvexHull(feasible_samples_2d)
+            hull_points = feasible_samples_2d[hull.vertices]
+            fig, ax = plt.subplots()
+            ax.fill(hull_points[:, 0], hull_points[:, 1], color='lightblue', alpha=0.5, edgecolor='blue')
+
+            # plot the terminal set
+            center = np.zeros(8)
+            center_2d, P_2d = project_ellipsoid_to_2d(P, center, [i, j])
+
+            eigvals, eigvecs = np.linalg.eigh(np.linalg.inv(P_2d))
+
+            # Width and height
+            width, height = 2 * np.sqrt(eigvals)  # Scaling axes length by sqrt of eigenvalues
+
+            # Orientation of the ellipse
+            angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))  # Orientation in degrees
+
+            ellipse = Ellipse(center_2d, width, height, angle=angle, color='green', alpha=0.4)
+
+            ax.add_patch(ellipse)
+
+            #add origin
+            plt.plot(0, 0, 'k+', markersize=20, markeredgewidth=1)
+
+            plt.axis('equal')
             plt.show()
+
+# for i in range(8):
+#     for j in range(8):
+#         if i != j:
+#             center_2d, A_2d = project_ellipsoid_to_2d(A, center, [i, j])
+#             ax = plot_ellipsoid_2d(center_2d, A_2d)
+#             plt.scatter(feasible_samples[:, i], feasible_samples[:, j], s=10)
+#             plt.title(f"2D MVEE Projection - states {i} and {j}")
+#             plt.show()
 
 
 # Q = np.eye(8)  # State cost matrix
@@ -273,3 +311,5 @@ for i in range(8):
 # x0[:2] = [10, 10]
 # res = check_feasibility(N, x0, A_d, B_d, constraints)
 # print(res)
+
+
