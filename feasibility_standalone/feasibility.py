@@ -44,13 +44,53 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints):
         return False
 
 
+def compute_bounding_box_cvxpy(H_x, h_x, default_bound=10.0):
+    """
+    Finds the upper and lower bounds of a bounding box around the state constraints.
+    This box is used for sampling states during the feasibility check.
+    """
+    dim = H_x.shape[1]
+    bounds = []
+    x = cp.Variable(dim)
+
+    constraints = [H_x @ x <= h_x]
+
+    for i in range(dim):
+        # Lower bound
+        obj_min = cp.Minimize(x[i])
+        prob_min = cp.Problem(obj_min, constraints)
+        prob_min.solve()
+
+        if prob_min.status == cp.OPTIMAL:
+            lower = prob_min.value
+        elif prob_min.status == cp.UNBOUNDED:
+            lower = -default_bound
+
+        # Upper bound
+        obj_max = cp.Maximize(x[i])
+        prob_max = cp.Problem(obj_max, constraints)
+        prob_max.solve()
+
+        if prob_max.status == cp.OPTIMAL:
+            upper = prob_max.value
+        elif prob_max.status == cp.UNBOUNDED:
+            upper = default_bound
+
+        bounds.append((lower, upper))
+
+    return np.array(bounds)
+
+
 def collect_feasible_samples(n_samples, N, A_d, B_d, constraints):
     H_x, _, h_x, _ = constraints
+    bounds = compute_bounding_box_cvxpy(H_x, h_x)
+
     feasible_samples = []
     while len(feasible_samples) < n_samples:
-        x0 = np.random.randn(8)
-        satisfied = np.all(H_x @ x0 <= h_x)
-        if satisfied:
+
+        x0 = np.array([np.random.uniform(low, high) for (low, high) in bounds])
+
+        if np.all(H_x @ x0 <= h_x):
             result = check_feasibility(N, x0, A_d, B_d, constraints)
             if result:
                 feasible_samples.append(x0)
