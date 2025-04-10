@@ -215,82 +215,86 @@ def generate_dynamics():
 
     return A_d, B_d
 
-dim_x_d = 8
-dim_u_d = 2
+# dim_x_d = 8
+# dim_u_d = 2
+#
+# # Constraints
+# H_x = np.zeros((4, dim_x_d))
+# h_x = np.zeros(4)
+#
+# H_u = np.zeros((2, dim_u_d))
+# h_u = np.zeros(2) * 1
+#
+#
+# H_x = np.array([[1, 0, 0, 0, 0, 0, 0 ,0],
+#                 [0, 1, 0, 0, 0, 0, 0 ,0],
+#                 [-1, 0, 0, 0, 0, 0, 0 ,0],
+#                 [0, -1, 0, 0, 0, 0, 0 ,0]])
+#
+#
+# H_x = np.vstack((np.eye(8), np.eye(8) * -1))
+#
+#
+# h_x = np.ones(H_x.shape[0]) * 2
+#
+# H_u = np.array([[1, 0],
+#                 [0, 1],
+#                 [-1, 0],
+#                 [0, -1]])
+#
+# h_u = np.ones(H_u.shape[0]) * 100
+#
+# constraints = (H_x, H_u, h_x, h_u)
+#
+# A_d, B_d = generate_dynamics()
+#
+# N = 20
+# n_samples = 100
+#
+# starttime = time()
+# feasible_samples = collect_feasible_samples(n_samples, N, A_d, B_d, constraints)
+# print(f"Total time to get all data for feasible region visualization: {time() - starttime}")
+#
+# Q = np.eye(8)  # State cost matrix
+# R = np.eye(2)  # Input cost matrix
+# P, _, _ = dare(A_d, B_d, Q, R)
+#
+#
+# for i in range(8):
+#     for j in range(8):
+#         if i != j:
+#             # Plot the admissible set
+#             feasible_samples_2d = feasible_samples[:, [i, j]]
+#             hull = ConvexHull(feasible_samples_2d)
+#             hull_points = feasible_samples_2d[hull.vertices]
+#             fig, ax = plt.subplots()
+#             ax.fill(hull_points[:, 0], hull_points[:, 1], color='lightblue', alpha=0.5, edgecolor='blue')
+#
+#             # plot the terminal set
+#             center = np.zeros(8)
+#             center_2d, P_2d = project_ellipsoid_to_2d(P, center, [i, j])
+#
+#             eigvals, eigvecs = np.linalg.eigh(np.linalg.inv(P_2d))
+#
+#             # Width and height
+#             width, height = 2 * np.sqrt(eigvals)  # Scaling axes length by sqrt of eigenvalues
+#
+#             # Orientation of the ellipse
+#             angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))  # Orientation in degrees
+#
+#             ellipse = Ellipse(center_2d, width, height, angle=angle, color='green', alpha=0.4)
+#
+#             ax.add_patch(ellipse)
+#
+#             #add origin
+#             plt.plot(0, 0, 'k+', markersize=20, markeredgewidth=1)
+#
+#             plt.axis('equal')
+#             plt.show()
 
-# Constraints
-H_x = np.zeros((4, dim_x_d))
-h_x = np.zeros(4)
-
-H_u = np.zeros((2, dim_u_d))
-h_u = np.zeros(2) * 1
 
 
-H_x = np.array([[1, 0, 0, 0, 0, 0, 0 ,0],
-                [0, 1, 0, 0, 0, 0, 0 ,0],
-                [-1, 0, 0, 0, 0, 0, 0 ,0],
-                [0, -1, 0, 0, 0, 0, 0 ,0]])
 
-
-H_x = np.vstack((np.eye(8), np.eye(8) * -1))
-
-
-h_x = np.ones(H_x.shape[0]) * 2
-
-H_u = np.array([[1, 0],
-                [0, 1],
-                [-1, 0],
-                [0, -1]])
-
-h_u = np.ones(H_u.shape[0]) * 100
-
-constraints = (H_x, H_u, h_x, h_u)
-
-A_d, B_d = generate_dynamics()
-
-N = 20
-n_samples = 100
-
-starttime = time()
-feasible_samples = collect_feasible_samples(n_samples, N, A_d, B_d, constraints)
-print(f"Total time to get all data for feasible region visualization: {time() - starttime}")
-
-Q = np.eye(8)  # State cost matrix
-R = np.eye(2)  # Input cost matrix
-P, _, _ = dare(A_d, B_d, Q, R)
-
-
-for i in range(8):
-    for j in range(8):
-        if i != j:
-            # Plot the admissible set
-            feasible_samples_2d = feasible_samples[:, [i, j]]
-            hull = ConvexHull(feasible_samples_2d)
-            hull_points = feasible_samples_2d[hull.vertices]
-            fig, ax = plt.subplots()
-            ax.fill(hull_points[:, 0], hull_points[:, 1], color='lightblue', alpha=0.5, edgecolor='blue')
-
-            # plot the terminal set
-            center = np.zeros(8)
-            center_2d, P_2d = project_ellipsoid_to_2d(P, center, [i, j])
-
-            eigvals, eigvecs = np.linalg.eigh(np.linalg.inv(P_2d))
-
-            # Width and height
-            width, height = 2 * np.sqrt(eigvals)  # Scaling axes length by sqrt of eigenvalues
-
-            # Orientation of the ellipse
-            angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))  # Orientation in degrees
-
-            ellipse = Ellipse(center_2d, width, height, angle=angle, color='green', alpha=0.4)
-
-            ax.add_patch(ellipse)
-
-            #add origin
-            plt.plot(0, 0, 'k+', markersize=20, markeredgewidth=1)
-
-            plt.axis('equal')
-            plt.show()
 
 # for i in range(8):
 #     for j in range(8):
