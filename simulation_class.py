@@ -6,11 +6,15 @@ from matplotlib.lines import Line2D
 
 
 class Simulation:
-    def __init__(self, drone, mpc_controller, g=9.81, dt=0.05):
+    def __init__(self, drone, mpc_controller, g=9.81, dt=0.01):
         self.drone=drone
         self.MPC_controller = mpc_controller
         self.g=g
         self.dt=dt
+        self.state_history = []
+        self.input_history = []
+        self.t = 0
+        self.F1, self.F2 = 0, 0
 
         # Matplotlib Setup
         self.fig, self.ax = plt.subplots()
@@ -111,15 +115,17 @@ class Simulation:
         psi_new = psi + psi_dot * self.dt
         theta_new = theta + theta_dot * self.dt
 
+        self.t += self.dt
+
         self.drone.update_state(np.array([x_new, y_new, psi_new, theta_new, vx_new, vy_new, psi_dot_new, theta_dot_new]))
 
     def animation_step(self, frame):
-
         # Get control inputs from the controller
-        F1, F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
+        if self.t % self.MPC_controller.timestep < 0.01:
+            self.F1, self.F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
 
         # Update states with control input and dynamics
-        self.physics_step(F1, F2)
+        self.physics_step(self.F1, self.F2)
 
         # Unpack current states
         x, y, psi, theta, _, _, _, _ = self.drone.state
@@ -144,15 +150,49 @@ class Simulation:
         self.arm_left.set_data([x, x + rotated_offsets[0, 0]], [y, y + rotated_offsets[0, 1]])
         self.arm_right.set_data([x, x + rotated_offsets[1, 0]], [y, y + rotated_offsets[1, 1]])
 
-        # Compute load position from drone position and rod geometry
+        # Compute load position
         load_x = x + self.drone.L_l * np.sin(theta)
         load_y = y - self.drone.L_l * np.cos(theta)
 
-        # Update rod (line) connecting drone and load
+        # Update pendulum
         self.rod_line.set_data([x, load_x], [y, load_y])
         self.load_patch.center = (load_x, load_y)
+
+        # Append inputs to history
+        self.state_history.append(self.drone.state.copy())
+        self.input_history.append(np.array([self.F1, self.F2]))
+
         return self.body_patch, self.thruster_left, self.thruster_right, self.arm_left, self.arm_right, self.load_patch, self.rod_line
 
-    def run_simulation(self):
-        ani = animation.FuncAnimation(self.fig, self.animation_step, frames=600, interval=self.dt * 1000, blit=False)
+    def plot_states(self):
+        if not self.state_history:
+            print("No history to plot.")
+            return
+
+        state_array = np.array(self.state_history)
+        input_array = np.array(self.input_history)
+
+        labels = ['x', 'y', 'psi', 'theta', 'vx', 'vy', 'psi_dot', 'theta_dot', "u_1", "u_2"]
+        fig, axs = plt.subplots(5, 2, figsize=(12, 10))
+        axs = axs.flatten()
+        t = np.arange(len(state_array)) * self.dt
+
+        for i in range(8):
+            axs[i].plot(t, state_array[:, i])
+            axs[i].set_title(labels[i])
+            axs[i].set_xlabel("Time [s]")
+            axs[i].grid(True)
+
+        for i in (8, 9):
+            axs[i].plot(t, input_array[:, i-8])
+            axs[i].set_title(labels[i])
+            axs[i].set_xlabel("Time [s]")
+            axs[i].grid(True)
+
+        plt.tight_layout()
         plt.show()
+
+    def run_simulation(self, frames=10):
+        ani = animation.FuncAnimation(self.fig, self.animation_step, frames=frames, interval=self.dt * 1000, blit=False, repeat=False)
+        plt.show()
+        self.plot_states()

@@ -26,8 +26,8 @@ x_ref = np.array([7.0, 9.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # Instantiate classes
 drone = Drone()
-controller = MPCController(drone, horizon=20, dt=1/5, constraints=constraints, Q=Q, R=R, x_ref=x_ref)
+controller = MPCController(drone, horizon=50, dt=1/10, constraints=constraints, Q=Q, R=R, x_ref=x_ref)
 simulation = sim.Simulation(drone, controller)
 
 # Run the simulation
-simulation.run_simulation()
+simulation.run_simulation(frames=6000)
