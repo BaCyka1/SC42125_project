@@ -8,11 +8,12 @@ from feasibility_standalone.feasibility import check_feasibility
 
 
 class MPCController:
-    def __init__(self, drone, constraints, horizon=20, dt=1/10, Q=np.eye(8), R=np.eye(2)):
+    def __init__(self, drone, constraints, horizon=20, dt=1/10, Q=np.eye(8), R=np.eye(2), x_ref=np.zeros(8)):
         print("setting up...")
         self.horizon = horizon
         self.timestep = dt
         self.drone = drone
+        self.x_ref = x_ref
 
         # Conversion to discrete time
         dim_x_d = drone.A_c.shape[0]
@@ -38,10 +39,11 @@ class MPCController:
         self.P, _, self.K = dare(self.A_d, self.B_d, Q, R)
 
         # Get parameter for terminal set
-        print("Computing gamma for terminal set...")
+        print("Computing scaling factor gamma for ellipsoidal terminal set...")
         u_lb = self.h_u[-1]
         u_ub = self.h_u[0]
         self.gamma = tsc.maximize_gamma(self.P, self.K, u_lb, u_ub)
+        print(f"Computed a gamma of {self.gamma}")
 
         # Flags
         self.admissibility_checked = False
@@ -57,15 +59,15 @@ class MPCController:
             print("Initial state not admissible!")
             return
 
-    def compute_control(self, current_state, target_state, gamma=2.18867187):
+    def compute_control(self, x_0):
         starttime = time()
 
         # Check admissibility if not done yet
         if not self.admissibility_checked:
-            self.check_admissibility(current_state)
+            self.check_admissibility(x_0)
 
         # Hovering target
-        u_target = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
+        u_ref = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
 
         # Variables
         x = [cp.Variable(8) for _ in range(self.horizon + 1)]
@@ -76,10 +78,10 @@ class MPCController:
         cost = 0.
 
         # Initial state
-        constraints += [x[0] == current_state.flatten()]
+        constraints += [x[0] == x_0.flatten()]
 
         for k in range(self.horizon):
-            cost += (cp.quad_form((x[k+1]-target_state), self.Q)  + cp.quad_form(u[k]-u_target, self.R))
+            cost += (cp.quad_form((x[k+1] - self.x_ref), self.Q)  + cp.quad_form(u[k] - u_ref, self.R))
             constraints += [
                 x[k + 1] == self.A_d @ x[k] + self.B_d @ u[k],
                 self.H_x @ x[k] <= self.h_x,
@@ -90,7 +92,7 @@ class MPCController:
         # constraints += [cp.quad_form(x[self.horizon]-target_state, self.P) <= gamma]
 
         # Terminal cost
-        cost += (cp.quad_form((x[self.horizon] - target_state), self.Q))
+        cost += (cp.quad_form((x[self.horizon] - self.x_ref), self.Q))
 
         # Solve the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)

@@ -95,11 +95,10 @@ def generate_dynamics():
 
     return A_d, B_d
 
-A_d, B_d = generate_dynamics()
-
-Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1])  # State penalties
-R = np.eye(2) * 1  # Control input penalties
-
-u_lb, u_ub = (-2, 2)
-P, _, K = dare(A_d, B_d, Q, R)
-print(maximize_gamma(P, K, u_lb, u_ub))
+# A_d, B_d = generate_dynamics()
+#
+# Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1])  # State penalties
+# R = np.eye(2) * 1  # Control input penalties
+#
+# u_lb, u_ub = (-2, 2)
+# P, _, K = dare(A_d, B_d, Q, R)

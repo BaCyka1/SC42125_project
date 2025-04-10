@@ -114,9 +114,9 @@ class Simulation:
         self.drone.update_state(np.array([x_new, y_new, psi_new, theta_new, vx_new, vy_new, psi_dot_new, theta_dot_new]))
 
     def animation_step(self, frame):
-        target_state1 = np.array([8.0, 9.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
         # Get control inputs from the controller
-        F1, F2 = self.MPC_controller.compute_control(current_state=self.drone.state, target_state=target_state1)
+        F1, F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
 
         # Update states with control input and dynamics
         self.physics_step(F1, F2)
