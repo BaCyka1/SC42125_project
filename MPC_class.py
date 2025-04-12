@@ -40,9 +40,9 @@ class MPCController:
 
         # Get parameter for terminal set
         print("Computing scaling factor gamma for ellipsoidal terminal set...")
-        u_lb = self.h_u[-1]
+        u_lb = - self.h_u[-1]
         u_ub = self.h_u[0]
-        self.gamma = tsc.maximize_gamma(self.P, self.K, u_lb, u_ub)
+        self.gamma = tsc.maximize_gamma(self.P, self.K, u_lb, u_ub)[0]
         print(f"Computed a gamma of {self.gamma}")
 
         # Flags
@@ -51,7 +51,7 @@ class MPCController:
         print("Setup complete.")
 
     def check_admissibility(self, current_state):
-        admissible = check_feasibility(self.horizon, current_state, self.A_d, self.B_d, self.constraints, self.gamma)
+        admissible = check_feasibility(self.horizon, current_state, self.A_d, self.B_d, self.constraints, self.P, self.gamma, self.x_ref)
         if admissible:
             self.admissibility_checked = True
             print("Initial state admissible, continuing to simulation")
@@ -62,14 +62,14 @@ class MPCController:
     def compute_control(self, x_0):
         starttime = time()
 
-        # Check admissibility if not done yet
+        # Check admissibility for initial state
         if not self.admissibility_checked:
             self.check_admissibility(x_0)
 
         # Hovering target
         u_ref = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
 
-        # Variables
+        # Decision variables
         x = [cp.Variable(8) for _ in range(self.horizon + 1)]
         u = [cp.Variable(2) for _ in range(self.horizon)]
 
@@ -80,6 +80,7 @@ class MPCController:
         # Initial state
         constraints += [x[0] == x_0.flatten()]
 
+        # Stage cost and stage constraints
         for k in range(self.horizon):
             cost += (cp.quad_form((x[k+1] - self.x_ref), self.Q)  + cp.quad_form(u[k] - u_ref, self.R))
             constraints += [
@@ -88,16 +89,16 @@ class MPCController:
                 self.H_u @ u[k] <= self.h_u,
             ]
         # Terminal state constraint
-        constraints += [self.H_x @ x[self.horizon] <= self.h_x]
-        # constraints += [cp.quad_form(x[self.horizon]-target_state, self.P) <= gamma]
+        # constraints += [self.H_x @ x[self.horizon] <= self.h_x]
+        constraints += [cp.quad_form(x[self.horizon] - self.x_ref, self.P) <= self.gamma] # Optional terminal set
 
-        # Terminal cost
-        cost += (cp.quad_form((x[self.horizon] - self.x_ref), self.Q))
+        # Terminal cost - Unconstrained infinite-horizon optimal cost
+        cost += (cp.quad_form((x[self.horizon] - self.x_ref), self.P))
 
         # Solve the problem
         problem = cp.Problem(cp.Minimize(cost), constraints)
-        problem.solve(solver=cp.SCS)
+        problem.solve(solver=cp.CLARABEL) # cp.SCS
 
         print(f"Time spent on this step's optimization: {time() - starttime}")
-        # Return first timestep of trajectory
+        # Return first timestep of input sequence
         return u[0].value

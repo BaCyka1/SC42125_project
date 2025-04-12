@@ -1,7 +1,7 @@
 import numpy as np
 
 class Drone:
-    def __init__(self, m_d=1.0, m_l=0.1, I_d=0.8, d=2.0, L_l=1.5, g=9.81, state_init=np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])):
+    def __init__(self, m_d=1.0, m_l=0.1, I_d=0.8, d=2.0, L_l=1.5, g=9.81, x_0=np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])):
         # -- Physics --
         self.m_d = m_d  # Drone mass (kg)
         self.m_l = m_l  # Load mass (kg)
@@ -12,7 +12,7 @@ class Drone:
         self.L_l = L_l  # Length of the massless rod suspending the load (m)
         self.g = g
         self.constants = np.array([m_d, m_l, I_d, self.L_d, L_l]) # All constant values
-        self.state = state_init # State: [x, y, psi, theta, vx, vy, psi_dot, theta_dot]
+        self.state = x_0 # State: [x, y, psi, theta, vx, vy, psi_dot, theta_dot]
 
         # Dynamics
         # Continuous time A matrix

@@ -1,12 +1,9 @@
 import numpy as np
 import itertools
 import scipy
-from control import dare
 from scipy.linalg import expm
 from scipy.optimize import minimize
 
-def compute_terminal_set(P, K):
-    pass
 
 def get_ellipsoid_polytope_corners(P, gamma):
     """
@@ -49,9 +46,9 @@ def maximize_gamma(P, K, u_lb, u_ub):
             return 1e6  # Penalize infeasible solutions
 
     # Initial guess for gamma
-    gamma_initial = 1.0
+    gamma_initial = 0
     # Constraints: gamma must be positive
-    bounds = [(0, 1e6)]
+    bounds = [(0, 1000)]
 
     # Run optimization using scipy
     result = scipy.optimize.minimize(objective, gamma_initial, bounds=bounds, method='SLSQP')

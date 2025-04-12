@@ -7,14 +7,10 @@ from control import dare
 from time import time
 from scipy.spatial import ConvexHull
 
-def check_feasibility(N, x0, A_d, B_d, problem_constraints, gamma=2.18867187):
+def check_feasibility(N, x0, A_d, B_d, problem_constraints, P, gamma, x_ref=np.zeros(8)):
     """
     Checks feasibility for a single initial state by attempting to solve a QCLP
     """
-    Q = np.eye(8)  # State cost matrix
-    R = np.eye(2)  # Input cost matrix
-    P, _, K = dare(A_d, B_d, Q, R)
-
     # Get shapes for dynamics
     dim_x_d = A_d.shape[0]
     dim_u_d = B_d.shape[1]
@@ -36,7 +32,7 @@ def check_feasibility(N, x0, A_d, B_d, problem_constraints, gamma=2.18867187):
         ]
     # Terminal state constraint
     constraints += [H_x @ x[N] <= h_x]
-    constraints += [cp.quad_form(x[N], P) <= gamma]
+    constraints += [cp.quad_form(x[N] - x_ref, P) <= gamma]
 
     prob = cp.Problem(cp.Minimize(0), constraints)
     prob.solve(solver=cp.SCS)
