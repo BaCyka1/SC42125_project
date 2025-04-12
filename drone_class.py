@@ -30,6 +30,9 @@ class Drone:
         self.B_c[6, 0] = - self.L_d / I_d
         self.B_c[6, 1] = self.L_d / I_d
 
+        # Observation matrix
+        self.C = np.zeros((3, 8))
+        self.C[:, :3] = np.eye(3)
 
     def update_state(self, state):
         self.state=state

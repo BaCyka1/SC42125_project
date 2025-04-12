@@ -10,9 +10,9 @@ h_x = np.ones(H_x.shape[0]) * 10
 
 # State constraint: Do not deviate far from equilibrium
 # to preserve validity of approximation
-# Absolute difference between theta and psi < pi/3
-h_x[2] = np.pi/3
-h_x[3] = np.pi/3
+# Absolute difference between theta and psi < pi/6
+h_x[2] = np.pi/6
+h_x[3] = np.pi/6
 H_x[3, 2] = -1
 
 H_u = np.array([[1, 0],
@@ -31,12 +31,15 @@ R = np.eye(2) * 0.01  # Control input penalties
 # Initial state
 x_0 = np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-# Target state
-x_ref = np.array([9.0, 8.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+# Target state (obsolete due to OTS implementation)
+# x_ref = np.array([9.0, 8.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+# Reference output
+y_ref = np.array([9.0, 8.0, 0])
 
 # Instantiate classes
 drone = Drone(x_0=x_0)
-controller = MPCController(drone, horizon=50, dt=1/10, constraints=constraints, Q=Q, R=R, x_ref=x_ref)
+controller = MPCController(drone, horizon=50, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref) # x_ref=x_ref
 simulation = sim.Simulation(drone, controller)
 
 # Run the simulation
