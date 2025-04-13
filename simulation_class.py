@@ -131,9 +131,10 @@ class Simulation:
 
         self.drone.update_state(new_state)
 
-    # Animation code written with GPT-4o
+    # Disclaimer: Animation code written with the help of GPT-4o
     def animation_step(self, frame):
         # Get control inputs from the controller
+        # Choose between MPC and LQR
         if not self.LQR:
             if self.t % self.MPC_controller.timestep < 0.01:
                 self.F1, self.F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
@@ -144,8 +145,6 @@ class Simulation:
             x_ref = self.MPC_controller.x_ref
             u_ref = self.MPC_controller.u_ref
             self.F1, self.F2 = - K @ (x - x_ref) + u_ref
-            print(self.F1, self.F2)
-            print(self.drone.state[:2])
 
         # Update states with control input and dynamics
         self.physics_step(self.F1, self.F2)
@@ -294,6 +293,7 @@ class Simulation:
 
     def run_simulation(self, frames=10):
         ani = animation.FuncAnimation(self.fig, self.animation_step, frames=frames, interval=self.dt * 1000, blit=False, repeat=False)
+        # ani.save("Animation.gif", fps=30)
         plt.show()
         # self.plot_states()
-        self.plot_lyapunov_decrease()
+        # self.plot_lyapunov_decrease()

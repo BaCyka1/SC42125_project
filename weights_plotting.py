@@ -36,22 +36,24 @@ R = np.eye(2) * 0.01  # Control input penalties
 x_0 = np.array([0.0, 0.0, 0, 0, 0.0, 0.0, 0.0, 0.0])
 
 # Reference output
-y_ref = np.array([2, 2, 0])
+y_ref = np.array([5, 5, 0])
 
 drone = Drone(x_0=x_0)
 controller = MPCController(drone, horizon=40, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
 simulation = sim.Simulation(drone, controller, dt=1/100, linear=False)
-simulation.run_simulation(frames=800)
+simulation.run_simulation(frames=600)
 run1_states = np.array(simulation.state_history)
 
+Q = np.eye(8)
+R = np.eye(2)
 drone = Drone(x_0=x_0)
-controller = MPCController(drone, horizon=10, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
-simulation = sim.Simulation(drone, controller, dt=1/100, linear=False, LQR=True)
-simulation.run_simulation(frames=800)
+controller = MPCController(drone, horizon=40, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
+simulation = sim.Simulation(drone, controller, dt=1/100, linear=False, LQR=False)
+simulation.run_simulation(frames=600)
 run2_states = np.array(simulation.state_history)
 
 
-labels = ["MPC", "LQR"]
+labels = ["Tuned", "Identity"]
 
 def plot_column_from_arrays(arrays, column_index, dt, labels=None):
     """

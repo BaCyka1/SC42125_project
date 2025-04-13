@@ -30,7 +30,7 @@ Q = np.diag([1, 1, 20, 20, 1, 1, 5, 5])  # State penalties
 R = np.eye(2) * 0.1  # Control input penalties
 
 # Initial state
-x_0 = np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+x_0 = np.array([0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # Reference output
 y_ref = np.array([6, 9, 0])
