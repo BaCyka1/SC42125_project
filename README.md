@@ -40,3 +40,4 @@ The project is structured as follows:
 
 ## The demo
 Want to demo the code? Run `main.py`. One can also easily play around the weights, constraints, and reference outputs in the same file -- just change the values in the arrays.
+A video of the simulation is also available through this link: https://www.youtube.com/watch?v=dvh5GzKWKmA
