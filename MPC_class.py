@@ -8,7 +8,7 @@ from feasibility_standalone.feasibility import check_feasibility
 
 
 class MPCController:
-    def __init__(self, drone, constraints, horizon=20, dt=1/10, Q=np.eye(8), R=np.eye(2), x_ref=np.zeros(8), y_ref=np.zeros(3)):
+    def __init__(self, drone, constraints, horizon=20, dt=1/10, Q=np.eye(8), R=np.eye(2), y_ref=np.zeros(3)):
         print("setting up...")
         self.horizon = horizon
         self.timestep = dt
@@ -41,12 +41,20 @@ class MPCController:
         self.R = R
         self.P, _, self.K = dare(self.A_d, self.B_d, Q, R)
 
+        try:
+            np.linalg.cholesky(self.P)
+            print("DARE matrix P is positive definite.")
+        except np.linalg.LinAlgError:
+            print("ERROR: DARE matrix P is NOT positive definite!")
+
         # Get parameter for terminal set
         print("Computing scaling factor gamma for ellipsoidal terminal set...")
         u_lb = - self.h_u[-1]
         u_ub = self.h_u[0]
-        self.gamma = tsc.maximize_gamma(self.P, self.K, u_lb, u_ub)[0]
+        self.gamma = tsc.maximize_gamma(self.P, self.K, u_lb, u_ub, self.H_x, self.h_x)[0]
         print(f"Computed a gamma of {self.gamma}")
+
+        self.execute_OTS()
 
         # Flags
         self.admissibility_checked = False
@@ -59,13 +67,15 @@ class MPCController:
         x_ref = cp.Variable(8)
         u_ref = cp.Variable(2)
 
-        # Hovering target
-        u_hover = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
+        # account for gravity in steady state
+        dt_mpc = self.timestep
+        d_d = np.zeros(8)
+        d_d[5] = -self.drone.g * dt_mpc
 
-        cost = (cp.quad_form(x_ref, np.eye(8)) + cp.quad_form(u_ref - u_hover, np.eye(2)))
+        cost = (cp.quad_form(x_ref, np.eye(8)) + cp.quad_form(u_ref, np.eye(2)))
 
         constraints = []
-        constraints += [((np.eye(self.A_d.shape[0]) - self.A_d) @ x_ref - self.B_d @ u_ref == 0)]
+        constraints += [((np.eye(self.A_d.shape[0]) - self.A_d) @ x_ref - self.B_d @ u_ref == d_d)]
         constraints += [(self.C @ x_ref == self.y_ref)]
         constraints += [self.H_x @ x_ref <= self.h_x]
         constraints += [self.H_u @ u_ref <= self.h_u]
@@ -93,7 +103,6 @@ class MPCController:
 
         # Check admissibility for initial state
         if not self.admissibility_checked:
-            self.execute_OTS()
             self.check_admissibility(x_0)
 
         # Decision variables
@@ -116,8 +125,8 @@ class MPCController:
                 self.H_u @ u[k] <= self.h_u,
             ]
         # Terminal state constraint
-        # constraints += [self.H_x @ x[self.horizon] <= self.h_x]
-        constraints += [cp.quad_form(x[self.horizon] - self.x_ref, self.P) <= self.gamma] # Optional terminal set
+        constraints += [self.H_x @ x[self.horizon] <= self.h_x]
+        constraints += [cp.quad_form(x[self.horizon] - self.x_ref, self.P) <= self.gamma]
 
         # Terminal cost - Unconstrained infinite-horizon optimal cost
         cost += (cp.quad_form((x[self.horizon] - self.x_ref), self.P))

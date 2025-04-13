@@ -3,7 +3,7 @@ import simulation_class as sim
 from drone_class import Drone
 from MPC_class import MPCController
 
-# Linear state and input constraints
+# Linear state and input constraints - box constraints
 H_x = np.vstack((np.eye(8), np.eye(8) * -1))
 
 h_x = np.ones(H_x.shape[0]) * 10
@@ -15,6 +15,7 @@ h_x[2] = np.pi/6
 h_x[3] = np.pi/6
 H_x[3, 2] = -1
 
+# Input constraints - lower and upper bound on thrust
 H_u = np.array([[1, 0],
                 [0, 1],
                 [-1, 0],
@@ -31,16 +32,13 @@ R = np.eye(2) * 0.01  # Control input penalties
 # Initial state
 x_0 = np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-# Target state (obsolete due to OTS implementation)
-# x_ref = np.array([9.0, 8.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
 # Reference output
-y_ref = np.array([9.0, 8.0, 0])
+y_ref = np.array([5, 7, 0])
 
 # Instantiate classes
 drone = Drone(x_0=x_0)
-controller = MPCController(drone, horizon=50, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref) # x_ref=x_ref
-simulation = sim.Simulation(drone, controller)
+controller = MPCController(drone, horizon=40, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
+simulation = sim.Simulation(drone, controller, dt=0.01)
 
 # Run the simulation
 simulation.run_simulation(frames=6000)

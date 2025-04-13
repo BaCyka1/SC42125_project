@@ -25,7 +25,7 @@ class Drone:
 
         # Continuous time B matrix
         self.B_c = np.zeros(shape=(8, 2))
-        self.B_c[5, 0] = 1/(m_d + m_l)
+        self.B_c[5, 0] = 1 / (m_d + m_l)
         self.B_c[5, 1] = 1 / (m_d + m_l)
         self.B_c[6, 0] = - self.L_d / I_d
         self.B_c[6, 1] = self.L_d / I_d

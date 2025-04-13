@@ -86,7 +86,7 @@ class Simulation:
 
         # y acceleration in inertial frame
         ddy = F_T * (
-                    -m_d * np.cos(psi) + m_l * np.sin(psi) * np.sin(theta) * np.cos(theta) + m_l * np.cos(psi) * np.cos(
+                    -m_d * np.cos(psi) - m_l * np.sin(psi) * np.sin(theta) * np.cos(theta) + m_l * np.cos(psi) * np.cos(
                 theta) ** 2 - m_l * np.cos(psi))
         ddy += self.g * (m_d ** 2 - m_d * m_l * np.sin(theta) ** 2 - m_d * m_l * np.cos(
             theta) ** 2 + 2 * m_d * m_l - m_l ** 2 * np.sin(theta) ** 2 - m_l ** 2 * np.cos(theta) ** 2 + m_l ** 2)
@@ -192,7 +192,85 @@ class Simulation:
         plt.tight_layout()
         plt.show()
 
+    def plot_lyapunov_decrease(self):
+        if not self.state_history or len(self.state_history) < 2:
+            print("Not enough history to plot Lyapunov decrease.")
+            return
+
+        state_array = np.array(self.state_history)
+        input_array = np.array(self.input_history) # Recorded at sim_dt
+
+        sim_dt = self.dt
+        mpc_dt = self.MPC_controller.timestep
+
+        # Calculate the number of full MPC intervals available in the data
+        steps_per_mpc_interval = int(round(mpc_dt / sim_dt))
+        num_mpc_intervals = (len(state_array) - 1) // steps_per_mpc_interval
+
+        # Check if controller references exist (OTS must have run successfully)
+        x_ref = self.MPC_controller.x_ref
+        u_ref = self.MPC_controller.u_ref
+        P = self.MPC_controller.P
+        Q = self.MPC_controller.Q
+        R = self.MPC_controller.R
+
+        negative_running_costs = []
+        terminal_costs_k = []       # V_f(x_k) at MPC times
+        terminal_costs_k_plus_1 = [] # V_f(x_{k+1}) at MPC times
+
+        # Iterate through MPC intervals k = 0 to num_mpc_intervals - 1
+        for k in range(num_mpc_intervals):
+            idx_k = k * steps_per_mpc_interval       # Index in state/input_array for start of interval k
+            idx_k_plus_1 = (k + 1) * steps_per_mpc_interval # Index for start of interval k+1
+
+            x_k = state_array[idx_k]
+            x_k_plus_1 = state_array[idx_k_plus_1]
+
+            # Get the input applied at the start of interval k (it was held constant)
+            u_k = input_array[idx_k]
+
+            # Calculate Lyapunov components
+            delta_x_k = x_k - x_ref
+            delta_x_k_plus_1 = x_k_plus_1 - x_ref
+            delta_u_k = u_k - u_ref
+
+            # Running Cost: l(x_k, u_k)
+            running_cost_k = delta_x_k.T @ Q @ delta_x_k + delta_u_k.T @ R @ delta_u_k
+            negative_running_costs.append(-running_cost_k)
+
+            # Terminal cost at start of interval k: V_f(x_k)
+            term_cost_k = delta_x_k.T @ P @ delta_x_k
+            terminal_costs_k.append(term_cost_k)
+
+            # Terminal cost at start of interval k+1: V_f(x_{k+1})
+            term_cost_k_plus_1 = delta_x_k_plus_1.T @ P @ delta_x_k_plus_1
+            terminal_costs_k_plus_1.append(term_cost_k_plus_1)
+
+        # Difference in terminal costs: V_f(x_{k+1}) - V_f(x_k) over MPC intervals
+        terminal_diffs = np.array(terminal_costs_k_plus_1) - np.array(terminal_costs_k)
+
+        # Time vector for plotting (corresponding to MPC steps k=0 to num_mpc_intervals-1)
+        t = np.arange(len(terminal_diffs)) * mpc_dt # Use MPC timestep
+
+        plt.figure(figsize=(10, 6))
+        # Only plot if we have data
+        if len(t) > 0:
+             plt.plot(t, terminal_diffs, label="$V_f(x_{k+1}) - V_f(x_k)$", marker='x', linestyle='-', color='blue')
+             plt.plot(t, negative_running_costs, label="$-l(x_k, u_k)$", marker='o', linestyle='--', color='orange')
+
+             # Add a zero line for reference
+             plt.axhline(0, color='gray', linestyle=':', linewidth=0.8)
+
+        plt.xlabel("Time [s] (at start of MPC interval k)")
+        plt.ylabel("Value")
+        plt.title("Lyapunov Decrease Check (MPC Timesteps): $V_f(x_{k+1}) - V_f(x_k)$ vs $-l(x_k, u_k)$")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
     def run_simulation(self, frames=10):
         ani = animation.FuncAnimation(self.fig, self.animation_step, frames=frames, interval=self.dt * 1000, blit=False, repeat=False)
         plt.show()
         self.plot_states()
+        self.plot_lyapunov_decrease()

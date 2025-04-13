@@ -20,7 +20,7 @@ def get_ellipsoid_polytope_corners(P, gamma):
     return corners
 
 
-def check_input_constraints_on_corners(K, corners, u_lb, u_ub):
+def check_input_constraints_on_corners(K, corners, u_lb, u_ub, H_x, h_x):
     """
     Check if all control inputs u = Kx (for each corner x) are within bounds.
     """
@@ -28,19 +28,20 @@ def check_input_constraints_on_corners(K, corners, u_lb, u_ub):
     for i, x_corner in enumerate(corners):
         u = K @ x_corner
         if not np.all((u_lb <= u) & (u <= u_ub)):
-            # print(f"[N] Corner {i}: u = {np.round(u,3)} violates bounds.")
-            all_feasible = False
+            if not np.all(H_x @ x_corner <= h_x):
+                # print(f"[N] Corner {i}: u = {np.round(u,3)} violates bounds.")
+                all_feasible = False
         else:
             # print(f"[Y] Corner {i}: u = {np.round(u,3)} within bounds.")
             pass
     return all_feasible
 
 
-def maximize_gamma(P, K, u_lb, u_ub):
+def maximize_gamma(P, K, u_lb, u_ub, H_x, h_x):
     # Objective function: Maximize gamma
     def objective(gamma):
         corners = get_ellipsoid_polytope_corners(P, gamma)
-        if check_input_constraints_on_corners(K, corners, u_lb, u_ub):
+        if check_input_constraints_on_corners(K, corners, u_lb, u_ub, H_x, h_x):
             return -gamma  # Minimize negative gamma to maximize gamma
         else:
             return 1e6  # Penalize infeasible solutions
@@ -91,11 +92,3 @@ def generate_dynamics():
     B_d = expm_AB_c[:dim_x_d, dim_x_d:]
 
     return A_d, B_d
-
-# A_d, B_d = generate_dynamics()
-#
-# Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1])  # State penalties
-# R = np.eye(2) * 1  # Control input penalties
-#
-# u_lb, u_ub = (-2, 2)
-# P, _, K = dare(A_d, B_d, Q, R)
