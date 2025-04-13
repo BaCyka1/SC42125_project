@@ -295,5 +295,5 @@ class Simulation:
         ani = animation.FuncAnimation(self.fig, self.animation_step, frames=frames, interval=self.dt * 1000, blit=False, repeat=False)
         # ani.save("Animation.gif", fps=30)
         plt.show()
-        # self.plot_states()
+        self.plot_states()
         # self.plot_lyapunov_decrease()
