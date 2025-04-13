@@ -244,7 +244,7 @@ class Simulation:
             delta_u_k = u_k - u_ref
 
             # Running Cost: l(x_k, u_k)
-            running_cost_k = delta_x_k.T @ Q @ delta_x_k + delta_u_k.T @ R @ delta_u_k
+            running_cost_k = 0.5 * (delta_x_k.T @ Q @ delta_x_k + delta_u_k.T @ R @ delta_u_k)
             negative_running_costs.append(-running_cost_k)
 
             # Terminal cost at start of interval k: V_f(x_k)
@@ -281,5 +281,5 @@ class Simulation:
     def run_simulation(self, frames=10):
         ani = animation.FuncAnimation(self.fig, self.animation_step, frames=frames, interval=self.dt * 1000, blit=False, repeat=False)
         plt.show()
-        self.plot_states()
+        # self.plot_states()
         self.plot_lyapunov_decrease()

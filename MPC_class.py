@@ -118,7 +118,7 @@ class MPCController:
 
         # Stage cost and stage constraints
         for k in range(self.horizon):
-            cost += (cp.quad_form((x[k+1] - self.x_ref), self.Q)  + cp.quad_form(u[k] - self.u_ref, self.R))
+            cost += (0.25 * (cp.quad_form((x[k+1] - self.x_ref), self.Q)  + cp.quad_form(u[k] - self.u_ref, self.R)))
             constraints += [
                 x[k + 1] == self.A_d @ x[k] + self.B_d @ u[k],
                 self.H_x @ x[k] <= self.h_x,
@@ -126,7 +126,7 @@ class MPCController:
             ]
         # Terminal state constraint
         constraints += [self.H_x @ x[self.horizon] <= self.h_x]
-        constraints += [cp.quad_form(x[self.horizon] - self.x_ref, self.P) <= self.gamma]
+        # constraints += [cp.quad_form(x[self.horizon] - self.x_ref, self.P) <= self.gamma]
 
         # Terminal cost - Unconstrained infinite-horizon optimal cost
         cost += (cp.quad_form((x[self.horizon] - self.x_ref), self.P))
