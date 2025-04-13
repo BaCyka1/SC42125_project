@@ -6,11 +6,13 @@ from matplotlib.lines import Line2D
 
 
 class Simulation:
-    def __init__(self, drone, mpc_controller, g=9.81, dt=0.01):
+    def __init__(self, drone, mpc_controller, g=9.81, dt=0.01, linear=True):
         self.drone=drone
         self.MPC_controller = mpc_controller
         self.g=g
         self.dt=dt
+        # Simulation type:
+        self.linear = linear
         self.state_history = []
         self.input_history = []
         self.t = 0
@@ -62,62 +64,69 @@ class Simulation:
         Update the state using the coupled drone-load dynamics.
         State: [x, y, psi, theta, vx, vy, omega, theta_dot]
         """
+
         # Get state from drone object
         x, y, psi, theta, vx, vy, psi_dot, theta_dot = self.drone.state
 
         m_d, m_l, I_d, L_d, L_l = self.drone.constants
 
-        # Calculate total force and torque caused by thust
-        F_T = F1 + F2
-        torque = L_d * (F2 - F1)
+        if not self.linear:
+            # Calculate total force and torque caused by thust
+            F_T = F1 + F2
+            torque = L_d * (F2 - F1)
 
-        # Solve for translational accelerations
-        # Denominator of translational accelerations
-        D_xy = -m_d ** 2 + m_d * m_l * np.sin(theta) ** 2 + m_d * m_l * np.cos(
-            theta) ** 2 - 2 * m_d * m_l + m_l ** 2 * np.sin(theta) ** 2 + m_l ** 2 * np.cos(theta) ** 2 - m_l ** 2
+            # Solve for translational accelerations
+            # Denominator of translational accelerations
+            D_xy = -m_d ** 2 + m_d * m_l * np.sin(theta) ** 2 + m_d * m_l * np.cos(
+                theta) ** 2 - 2 * m_d * m_l + m_l ** 2 * np.sin(theta) ** 2 + m_l ** 2 * np.cos(theta) ** 2 - m_l ** 2
 
-        # x acceleration in inertial frame
-        ddx = F_T * (m_d * np.sin(psi) - m_l * np.sin(psi) * np.sin(theta) ** 2 + m_l * np.sin(psi) - m_l * np.sin(
-            theta) * np.cos(psi) * np.cos(theta))
-        ddx += L_l * (-m_d * m_l * np.sin(theta) * theta_dot ** 2 + m_l ** 2 * np.sin(theta) ** 3 * theta_dot ** 2)
-        ddx += L_l * (m_l ** 2 * np.sin(theta) * np.cos(theta) ** 2 * theta_dot ** 2 - m_l ** 2 * np.sin(
-            theta) * theta_dot ** 2)
-        ddx /= D_xy
+            # x acceleration in inertial frame
+            ddx = F_T * (m_d * np.sin(psi) - m_l * np.sin(psi) * np.sin(theta) ** 2 + m_l * np.sin(psi) - m_l * np.sin(
+                theta) * np.cos(psi) * np.cos(theta))
+            ddx += L_l * (-m_d * m_l * np.sin(theta) * theta_dot ** 2 + m_l ** 2 * np.sin(theta) ** 3 * theta_dot ** 2)
+            ddx += L_l * (m_l ** 2 * np.sin(theta) * np.cos(theta) ** 2 * theta_dot ** 2 - m_l ** 2 * np.sin(
+                theta) * theta_dot ** 2)
+            ddx /= D_xy
 
-        # y acceleration in inertial frame
-        ddy = F_T * (
-                    -m_d * np.cos(psi) - m_l * np.sin(psi) * np.sin(theta) * np.cos(theta) + m_l * np.cos(psi) * np.cos(
-                theta) ** 2 - m_l * np.cos(psi))
-        ddy += self.g * (m_d ** 2 - m_d * m_l * np.sin(theta) ** 2 - m_d * m_l * np.cos(
-            theta) ** 2 + 2 * m_d * m_l - m_l ** 2 * np.sin(theta) ** 2 - m_l ** 2 * np.cos(theta) ** 2 + m_l ** 2)
-        ddy += L_l * (m_d * m_l * np.cos(theta) * theta_dot ** 2 - m_l ** 2 * np.sin(theta) ** 2 * np.cos(
-            theta) * theta_dot ** 2 - m_l ** 2 * np.cos(theta) ** 3 * theta_dot ** 2 + m_l ** 2 * np.cos(
-            theta) * theta_dot ** 2)
-        ddy /= D_xy
+            # y acceleration in inertial frame
+            ddy = F_T * (
+                        -m_d * np.cos(psi) - m_l * np.sin(psi) * np.sin(theta) * np.cos(theta) + m_l * np.cos(psi) * np.cos(
+                    theta) ** 2 - m_l * np.cos(psi))
+            ddy += self.g * (m_d ** 2 - m_d * m_l * np.sin(theta) ** 2 - m_d * m_l * np.cos(
+                theta) ** 2 + 2 * m_d * m_l - m_l ** 2 * np.sin(theta) ** 2 - m_l ** 2 * np.cos(theta) ** 2 + m_l ** 2)
+            ddy += L_l * (m_d * m_l * np.cos(theta) * theta_dot ** 2 - m_l ** 2 * np.sin(theta) ** 2 * np.cos(
+                theta) * theta_dot ** 2 - m_l ** 2 * np.cos(theta) ** 3 * theta_dot ** 2 + m_l ** 2 * np.cos(
+                theta) * theta_dot ** 2)
+            ddy /= D_xy
 
-        # Denominator of theta acceleration
-        D_theta = -L_l * m_d + L_l * m_l * np.sin(theta) ** 2 + L_l * m_l * np.cos(theta) ** 2 - L_l * m_l
+            # Denominator of theta acceleration
+            D_theta = -L_l * m_d + L_l * m_l * np.sin(theta) ** 2 + L_l * m_l * np.cos(theta) ** 2 - L_l * m_l
 
-        # Pendulum (load) dynamics:
-        ddtheta = F_T * (- np.sin(psi) * np.cos(theta) + np.cos(psi) * np.sin(theta)) / D_theta
+            # Pendulum (load) dynamics:
+            ddtheta = F_T * (- np.sin(psi) * np.cos(theta) + np.cos(psi) * np.sin(theta)) / D_theta
 
-        # Drone rotational acceleration
-        ddpsi = torque / I_d
+            # Drone rotational acceleration
+            ddpsi = torque / I_d
 
-        # Euler integration
-        vx_new = vx + ddx * self.dt
-        vy_new = vy + ddy * self.dt
-        psi_dot_new = psi_dot + ddpsi * self.dt
-        theta_dot_new = theta_dot + ddtheta * self.dt
+            # Euler integration
+            vx_new = vx + ddx * self.dt
+            vy_new = vy + ddy * self.dt
+            psi_dot_new = psi_dot + ddpsi * self.dt
+            theta_dot_new = theta_dot + ddtheta * self.dt
 
-        x_new = x + vx * self.dt
-        y_new = y + vy * self.dt
-        psi_new = psi + psi_dot * self.dt
-        theta_new = theta + theta_dot * self.dt
+            x_new = x + vx * self.dt
+            y_new = y + vy * self.dt
+            psi_new = psi + psi_dot * self.dt
+            theta_new = theta + theta_dot * self.dt
+
+            new_state = np.array([x_new, y_new, psi_new, theta_new, vx_new, vy_new, psi_dot_new, theta_dot_new])
+
+        else:
+            new_state = self.MPC_controller.A_d @ self.drone.state + self.MPC_controller.B_d @ np.array([F1, F2])
 
         self.t += self.dt
 
-        self.drone.update_state(np.array([x_new, y_new, psi_new, theta_new, vx_new, vy_new, psi_dot_new, theta_dot_new]))
+        self.drone.update_state(new_state)
 
     def animation_step(self, frame):
         # Get control inputs from the controller
