@@ -1,21 +1,20 @@
 # Solution repository for SC42125 - MPC
--------------------------
 ## General information
 Welcome to the repository for our project solution. It contains all the code written for the project.
 
 The entire codebase is written in Python 3.10, so no builds are required. It requires the following packages and their dependencies:
-`numpy`
-`sympy`
-`scipy`
-`cvxpy`
-`control
-`IPython`
-`matplotlib`
+- `numpy`
+- `sympy`
+- `scipy`
+- `cvxpy`
+- `control`
+- `IPython`
+- `matplotlib`
 
 For the analysis Jupyter notebook file you will additionally need:
-`qpsolvers
-`shapely`
-`geopandas`
+- `qpsolvers
+- `shapely`
+- `geopandas`
 
 All packages are of their latest version as of writing (2025-04-13).
 
