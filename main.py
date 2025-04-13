@@ -1,15 +1,14 @@
 import numpy as np
-import simulation_class as sim
-from drone_class import Drone
-from MPC_class import MPCController
+import classes.simulation_class as sim
+from classes.drone_class import Drone
+from classes.MPC_class import MPCController
 
 # Linear state and input constraints - box constraints
 H_x = np.vstack((np.eye(8), np.eye(8) * -1))
 
 h_x = np.ones(H_x.shape[0]) * 10
 
-# State constraint: Do not deviate far from equilibrium
-# to preserve validity of approximation
+# State constraint: Do not deviate far from equilibrium to preserve validity of approximation
 # Absolute difference between theta and psi < pi/6
 h_x[2] = np.pi/8
 h_x[3] = np.pi/8
