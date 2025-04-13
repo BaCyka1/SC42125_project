@@ -55,11 +55,14 @@ class MPCController:
 
     def execute_OTS(self):
         print("Executing Optimal Target Selection...")
-
+        # Decision variables
         x_ref = cp.Variable(8)
         u_ref = cp.Variable(2)
 
-        cost = (cp.quad_form(x_ref, np.eye(8)))
+        # Hovering target
+        u_hover = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
+
+        cost = (cp.quad_form(x_ref, np.eye(8)) + cp.quad_form(u_ref - u_hover, np.eye(2)))
 
         constraints = []
         constraints += [((np.eye(self.A_d.shape[0]) - self.A_d) @ x_ref - self.B_d @ u_ref == 0)]
@@ -87,15 +90,11 @@ class MPCController:
 
     def compute_control(self, x_0):
         starttime = time()
-        print("here!")
 
         # Check admissibility for initial state
         if not self.admissibility_checked:
             self.execute_OTS()
             self.check_admissibility(x_0)
-
-        # Hovering target
-        #u_ref = np.array([self.drone.m * self.drone.g / 2, self.drone.m * self.drone.g / 2])
 
         # Decision variables
         x = [cp.Variable(8) for _ in range(self.horizon + 1)]
