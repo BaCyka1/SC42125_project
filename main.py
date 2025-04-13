@@ -26,19 +26,19 @@ h_u = np.ones(H_u.shape[0]) * 20
 constraints = (H_x, H_u, h_x, h_u)
 
 # State and input penalties, tuned to stay near equilibrium
-Q = np.diag([1, 20, 20, 20, 1, 1, 5, 5])  # State penalties
-R = np.eye(2) * 0.0  # Control input penalties
+Q = np.diag([1, 1, 20, 20, 1, 1, 5, 5])  # State penalties
+R = np.eye(2) * 0.1  # Control input penalties
 
 # Initial state
 x_0 = np.array([0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # Reference output
-y_ref = np.array([6, 6, 0])
+y_ref = np.array([6, 9, 0])
 
 # Instantiate classes
 drone = Drone(x_0=x_0)
-controller = MPCController(drone, horizon=40, dt=1/50, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
-simulation = sim.Simulation(drone, controller, dt=1/100, linear=False)
+controller = MPCController(drone, horizon=40, dt=1/10, constraints=constraints, Q=Q, R=R, y_ref=y_ref)
+simulation = sim.Simulation(drone, controller, dt=1/100, linear=False, LQR=False)
 
 # Run the simulation
 simulation.run_simulation(frames=600)

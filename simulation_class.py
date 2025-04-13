@@ -6,13 +6,14 @@ from matplotlib.lines import Line2D
 
 
 class Simulation:
-    def __init__(self, drone, mpc_controller, g=9.81, dt=0.01, linear=True):
+    def __init__(self, drone, mpc_controller, g=9.81, dt=0.01, linear=True, LQR=False):
         self.drone=drone
         self.MPC_controller = mpc_controller
         self.g=g
         self.dt=dt
         # Simulation type:
         self.linear = linear
+        self.LQR = LQR
         self.state_history = []
         self.input_history = []
         self.t = 0
@@ -122,16 +123,29 @@ class Simulation:
             new_state = np.array([x_new, y_new, psi_new, theta_new, vx_new, vy_new, psi_dot_new, theta_dot_new])
 
         else:
-            new_state = self.MPC_controller.A_d @ self.drone.state + self.MPC_controller.B_d @ np.array([F1, F2])
+            x_dot = self.drone.A_c @ self.drone.state + self.drone.B_c @ np.array([F1, F2])
+            x_dot[5] -= self.g # Add continuous gravity effect directly
+            new_state = self.drone.state + x_dot * self.dt
 
         self.t += self.dt
 
         self.drone.update_state(new_state)
 
+    # Animation code written with GPT-4o
     def animation_step(self, frame):
         # Get control inputs from the controller
-        if self.t % self.MPC_controller.timestep < 0.01:
-            self.F1, self.F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
+        if not self.LQR:
+            if self.t % self.MPC_controller.timestep < 0.01:
+                self.F1, self.F2 = self.MPC_controller.compute_control(x_0=self.drone.state)
+
+        else:
+            K = self.MPC_controller.K
+            x = self.drone.state
+            x_ref = self.MPC_controller.x_ref
+            u_ref = self.MPC_controller.u_ref
+            self.F1, self.F2 = - K @ (x - x_ref) + u_ref
+            print(self.F1, self.F2)
+            print(self.drone.state[:2])
 
         # Update states with control input and dynamics
         self.physics_step(self.F1, self.F2)
@@ -270,9 +284,9 @@ class Simulation:
              # Add a zero line for reference
              plt.axhline(0, color='gray', linestyle=':', linewidth=0.8)
 
-        plt.xlabel("Time [s] (at start of MPC interval k)")
+        plt.xlabel("Time [s]")
         plt.ylabel("Value")
-        plt.title("Lyapunov Decrease Check (MPC Timesteps): $V_f(x_{k+1}) - V_f(x_k)$ vs $-l(x_k, u_k)$")
+        plt.title("Lyapunov Decrease: (MPC Timesteps): $V_f(x_{k+1}) - V_f(x_k)$ vs $-l(x_k, u_k)$")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
